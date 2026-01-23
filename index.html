@@ -7,55 +7,71 @@
         <title>Tiagile - UWB & IoT 行业情报</title>
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
         <style>
+            :root { --primary-color: #0061ff; --bg-color: #f4f7fa; }
             body {
                 font-family: 'Poppins', 'Noto Sans SC', sans-serif;
                 margin: 0; padding: 0;
-                background: linear-gradient(rgba(240, 242, 250, 0.9), rgba(240, 242, 250, 0.9)), url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1920&q=80');
-                background-size: cover; background-attachment: fixed; background-position: center;
-                min-height: 100vh; display: flex; justify-content: center; align-items: flex-start;
+                background-color: var(--bg-color);
+                background-image: linear-gradient(rgba(244, 247, 250, 0.9), rgba(244, 247, 250, 0.9)), url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1920&q=80');
+                background-size: cover; background-attachment: fixed;
+                color: #333;
             }
             .main-container {
-                width: 90%; max-width: 800px; margin: 60px 0; padding: 40px;
-                background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-                border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); border: 1px solid rgba(255, 255, 255, 0.6);
+                max-width: 1000px;
+                margin: 40px auto; padding: 20px;
             }
-            .header-section { text-align: center; margin-bottom: 50px; }
+            .header-section { text-align: center; margin-bottom: 40px; padding: 20px; }
             h1 {
-                font-weight: 800; font-size: 2.4rem; margin-bottom: 10px;
+                font-weight: 800; font-size: 2.5rem; margin: 0;
                 background: linear-gradient(135deg, #0061ff, #60efff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-                display: inline-block; letter-spacing: -1px;
+                letter-spacing: -1px;
             }
-            .date { color: #555; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 0.9rem; }
+            .date { color: #666; font-weight: 600; margin-top: 5px; font-size: 0.9rem; text-transform: uppercase; }
+
+            .section-header {
+                font-size: 1.4rem; font-weight: 700; color: #2c3e50;
+                margin: 30px 0 15px 0; padding-left: 15px;
+                border-left: 5px solid var(--primary-color);
+            }
             
+            .news-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+                gap: 20px;
+            }
+
             .card {
-                background: #ffffff; padding: 25px; margin-bottom: 25px;
-                border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: all 0.3s ease;
-                border-left: 6px solid #0061ff; position: relative;
+                background: #ffffff; padding: 20px;
+                border-radius: 12px;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+                transition: transform 0.2s, box-shadow 0.2s;
+                border: 1px solid rgba(0,0,0,0.05);
+                display: flex; flex-direction: column;
             }
-            .card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.1); }
+            .card:hover { transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,0,0,0.08); }
             
-            .meta-info { display: flex; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+            .meta-info { display: flex; align-items: center; margin-bottom: 10px; font-size: 0.8em; }
             .tag { 
-                background: linear-gradient(135deg, #0061ff, #60efff); color: white; 
-                padding: 4px 12px; border-radius: 20px; font-size: 0.7em; font-weight: 700; 
-                margin-right: 10px; box-shadow: 0 2px 5px rgba(0,97,255,0.3);
+                background: #eef4ff; color: var(--primary-color); 
+                padding: 3px 8px; border-radius: 6px; font-weight: 700; margin-right: 8px; 
             }
-            .source { color: #888; font-size: 0.85em; font-weight: 600; }
+            .source { color: #888; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
             
             a.title-link { 
-                text-decoration: none; color: #1a1a1a; font-size: 1.25em; font-weight: 700; 
-                display: block; margin-bottom: 12px; line-height: 1.4; transition: color 0.2s;
+                text-decoration: none; color: #1a1a1a; font-size: 1.1rem; font-weight: 700; 
+                line-height: 1.4; margin-bottom: 10px; display: block;
             }
-            a.title-link:hover { color: #0061ff; }
-            .summary { color: #555; font-size: 0.95em; line-height: 1.7; margin: 0; text-align: justify; }
-            
-            .empty-msg { text-align: center; padding: 60px 20px; color: #888; }
-            .empty-msg h3 { font-size: 3em; margin: 0 0 20px 0; }
-            
-            .footer { margin-top: 60px; text-align: center; padding-top: 30px; border-top: 2px solid rgba(0,0,0,0.05); }
-            .tiagile-logo { font-size: 1.8rem; font-weight: 800; color: #2c3e50; letter-spacing: -1px; display: inline-block; }
+            a.title-link:hover { color: var(--primary-color); }
+            .summary { color: #555; font-size: 0.9rem; line-height: 1.6; margin: 0; flex-grow: 1; }
+
+            .footer { margin-top: 60px; text-align: center; color: #aaa; font-size: 0.8rem; padding-bottom: 20px; }
+            .tiagile-logo { font-size: 1.5rem; font-weight: 800; color: #2c3e50; }
             .tiagile-logo span { color: #0061ff; }
-            .footer-note { color: #aaa; font-size: 0.8em; margin-top: 10px; font-weight: 600; }
+
+            @media (max-width: 600px) {
+                .news-grid { grid-template-columns: 1fr; }
+                h1 { font-size: 2rem; }
+            }
         </style>
     </head>
     <body>
@@ -66,127 +82,133 @@
             </div>
             
             
-    
-        <div class="card">
-            <div class="meta-info">
-                <span class="tag">NEWS</span>
-                <span class="source">FiRa Consortium · 01-23</span>
-            </div>
-            <a href="https://www.firaconsortium.org/about/news-events/press-releases" class="title-link" target="_blank">🔗 FiRa 联盟官方新闻中心 (点击直达)</a>
-            <p class="summary">FiRa 联盟官方发布的最新标准、认证产品及成员动态。</p>
-        </div>
+        <div class="section-header">🏛️ 权威发布 & 标准动态</div>
+        <div class="news-grid">
         
-        <div class="card">
-            <div class="meta-info">
-                <span class="tag">NEWS</span>
-                <span class="source">RFID世界网 (via Google) · 01-19</span>
+            <div class="card">
+                <div class="meta-info">
+                    <span class="tag">STANDARDS</span>
+                    <span class="source">FiRa Consortium · 01-23</span>
+                </div>
+                <a href="https://www.firaconsortium.org/about/news-events/press-releases" class="title-link" target="_blank">FiRa 联盟官方新闻中心 (点击直达)</a>
+                <p class="summary">FiRa 联盟官方发布的最新标准、认证产品及成员动态。</p>
             </div>
-            <a href="https://news.google.com/rss/articles/CBMibEFVX3lxTE8xTk5aVzd4QlljVmVxZEkxV1lxWWFVZFhJUDFEVDF5YzVXN1FjVEEwYUhnblJmbnJoOWVOSVVRSWNlbjh4dmEyRGJ0b3B6aDl4alQxU0kzM2Y0dy1EVDQyYVlJZzZWelRSZGxrSA?oc=5" class="title-link" target="_blank">政策+事故双重警示！RFID+UWB高精度定位，筑牢工业安全生命线- RFID新闻中心</a>
-            <p class="summary">政策+事故双重警示！RFID+UWB高精度定位，筑牢工业安全生命线- RFID新闻中心 RFID世界网</p>
-        </div>
-        
-        <div class="card">
-            <div class="meta-info">
-                <span class="tag">NEWS</span>
-                <span class="source">Sohu (via Google) · 01-19</span>
+            
+            <div class="card">
+                <div class="meta-info">
+                    <span class="tag">STANDARDS</span>
+                    <span class="source">驱动之家 · 01-06</span>
+                </div>
+                <a href="https://news.google.com/rss/articles/CBMiWEFVX3lxTE1EMGt6dENPY3dDLXpGNEZ4ZEgzamR6SHBKR2VhcjY2bEt3OXhxeUJfQUR3ZEgzRmQ0Y3NodnN2RkxjcC1haTIxMlc0azdmR0M3WUo1bmRPZFc?oc=5" class="title-link" target="_blank">CES 2026加特兰推出全球首个4ab标准BLE-MMS UWB测试解决方案‌</a>
+                <p class="summary">CES 2026加特兰推出全球首个4ab标准BLE-MMS UWB测试解决方案‌</p>
             </div>
-            <a href="https://news.google.com/rss/articles/CBMi5gFBVV95cUxQb1RkWWF6Q1J3Z3lMTlcyNHJuejU5NUpKVWtBcWRCdXNkNHlXX0ZhLUJCNkw1UWZEWndrZGdITVBQLWpjdVhWVl9mMmpub3l3MmVFajlXUWxPbFZlVjFjb3Z3amVCQkFock9iWDhXeGpiS3ZHY05zTTdReTVQQTQ1MjFLeXdLXzRKZEJLZ3FjSE1NMmoySG54cTQzMUQ0Z0ZuOWVtSzV6NDY1Mm8tc3lObW0yZmdGOUF0eTVNZXBjU1p0LVhsRzVRSW1jS3J0NzlWaE5STG1EZEVZSV9ZckFRUTVTcWZpQQ?oc=5" class="title-link" target="_blank">2000万颗做起点，加特兰锚定“十五五”芯片新局</a>
-            <p class="summary">2000万颗做起点，加特兰锚定“十五五”芯片新局 Sohu</p>
-        </div>
-        
-        <div class="card">
-            <div class="meta-info">
-                <span class="tag">NEWS</span>
-                <span class="source">电子工程专辑 (via Google) · 01-17</span>
             </div>
-            <a href="https://news.google.com/rss/articles/CBMiU0FVX3lxTE9qVFlaV05UQU5Mb01SYzJOc0ROZEQ2TXQ3dGRJLUUtMDBaSC04aFdSbE1WLTdJS0dfQVBDcWVCbHE1bnJDaHI2YVFObUNpS0dDbFpr?oc=5" class="title-link" target="_blank">UWB-B段市场有哪些还不错的市场？</a>
-            <p class="summary">UWB-B段市场有哪些还不错的市场？ 电子工程专辑</p>
-        </div>
+        <div class="section-header">💎 芯片原厂 & 核心技术</div>
+        <div class="news-grid">
         
-        <div class="card">
-            <div class="meta-info">
-                <span class="tag">NEWS</span>
-                <span class="source">RFID世界网 (via Google) · 01-15</span>
+            <div class="card">
+                <div class="meta-info">
+                    <span class="tag">CHIPS</span>
+                    <span class="source">RFID世界网 · 01-19</span>
+                </div>
+                <a href="https://news.google.com/rss/articles/CBMibEFVX3lxTE8xTk5aVzd4QlljVmVxZEkxV1lxWWFVZFhJUDFEVDF5YzVXN1FjVEEwYUhnblJmbnJoOWVOSVVRSWNlbjh4dmEyRGJ0b3B6aDl4alQxU0kzM2Y0dy1EVDQyYVlJZzZWelRSZGxrSA?oc=5" class="title-link" target="_blank">政策+事故双重警示！RFID+UWB高精度定位，筑牢工业安全生命线- RFID新闻中心</a>
+                <p class="summary">政策+事故双重警示！RFID+UWB高精度定位，筑牢工业安全生命线- RFID新闻中心</p>
             </div>
-            <a href="https://news.google.com/rss/articles/CBMiakFVX3lxTE5wbTBqM1pHSzJfblBibGpzRG16YjQwQlRCUDVTNGhEUUZMYjV4WFN0M2VMaW9zWUJaeV9mc2pzYlJRQWVOV09yMGh6NUE3MGtPbHp6MjhRcmJsTU1ONnNJVWhUdXVOY1lxT1E?oc=5" class="title-link" target="_blank">电视变“礼器”？UWB指向遥控逐渐成为这个行业的必选项</a>
-            <p class="summary">电视变“礼器”？UWB指向遥控逐渐成为这个行业的必选项 RFID世界网</p>
-        </div>
-        
-        <div class="card">
-            <div class="meta-info">
-                <span class="tag">NEWS</span>
-                <span class="source">电子工程专辑 (via Google) · 01-08</span>
+            
+            <div class="card">
+                <div class="meta-info">
+                    <span class="tag">CHIPS</span>
+                    <span class="source">Sohu · 01-19</span>
+                </div>
+                <a href="https://news.google.com/rss/articles/CBMi5gFBVV95cUxQb1RkWWF6Q1J3Z3lMTlcyNHJuejU5NUpKVWtBcWRCdXNkNHlXX0ZhLUJCNkw1UWZEWndrZGdITVBQLWpjdVhWVl9mMmpub3l3MmVFajlXUWxPbFZlVjFjb3Z3amVCQkFock9iWDhXeGpiS3ZHY05zTTdReTVQQTQ1MjFLeXdLXzRKZEJLZ3FjSE1NMmoySG54cTQzMUQ0Z0ZuOWVtSzV6NDY1Mm8tc3lObW0yZmdGOUF0eTVNZXBjU1p0LVhsRzVRSW1jS3J0NzlWaE5STG1EZEVZSV9ZckFRUTVTcWZpQQ?oc=5" class="title-link" target="_blank">2000万颗做起点，加特兰锚定“十五五”芯片新局</a>
+                <p class="summary">2000万颗做起点，加特兰锚定“十五五”芯片新局</p>
             </div>
-            <a href="https://news.google.com/rss/articles/CBMiU0FVX3lxTE44ejktQWlXM3RJdjVUSFVKSTIxcVctdzBSWDcxb3ZBQmtxU0NYWWFxa3M1N1p1anpJQ3lxd0pIVnVHNFdRZUFpYllZeDlxVUZYRGlB?oc=5" class="title-link" target="_blank">UWB产业圈，半个圈子大咖都来了！</a>
-            <p class="summary">UWB产业圈，半个圈子大咖都来了！ 电子工程专辑</p>
-        </div>
-        
-        <div class="card">
-            <div class="meta-info">
-                <span class="tag">NEWS</span>
-                <span class="source">驱动之家 (via Google) · 01-06</span>
+            
+            <div class="card">
+                <div class="meta-info">
+                    <span class="tag">CHIPS</span>
+                    <span class="source">电子工程专辑 · 01-17</span>
+                </div>
+                <a href="https://news.google.com/rss/articles/CBMiU0FVX3lxTE9qVFlaV05UQU5Mb01SYzJOc0ROZEQ2TXQ3dGRJLUUtMDBaSC04aFdSbE1WLTdJS0dfQVBDcWVCbHE1bnJDaHI2YVFObUNpS0dDbFpr?oc=5" class="title-link" target="_blank">UWB-B段市场有哪些还不错的市场？</a>
+                <p class="summary">UWB-B段市场有哪些还不错的市场？</p>
             </div>
-            <a href="https://news.google.com/rss/articles/CBMiWEFVX3lxTE1EMGt6dENPY3dDLXpGNEZ4ZEgzamR6SHBKR2VhcjY2bEt3OXhxeUJfQUR3ZEgzRmQ0Y3NodnN2RkxjcC1haTIxMlc0azdmR0M3WUo1bmRPZFc?oc=5" class="title-link" target="_blank">CES 2026加特兰推出全球首个4ab标准BLE-MMS UWB测试解决方案‌</a>
-            <p class="summary">CES 2026加特兰推出全球首个4ab标准BLE-MMS UWB测试解决方案‌ 驱动之家</p>
-        </div>
-        
-        <div class="card">
-            <div class="meta-info">
-                <span class="tag">NEWS</span>
-                <span class="source">电子工程专辑 (via Google) · 01-06</span>
+            
+            <div class="card">
+                <div class="meta-info">
+                    <span class="tag">CHIPS</span>
+                    <span class="source">RFID世界网 · 01-15</span>
+                </div>
+                <a href="https://news.google.com/rss/articles/CBMiakFVX3lxTE5wbTBqM1pHSzJfblBibGpzRG16YjQwQlRCUDVTNGhEUUZMYjV4WFN0M2VMaW9zWUJaeV9mc2pzYlJRQWVOV09yMGh6NUE3MGtPbHp6MjhRcmJsTU1ONnNJVWhUdXVOY1lxT1E?oc=5" class="title-link" target="_blank">电视变“礼器”？UWB指向遥控逐渐成为这个行业的必选项</a>
+                <p class="summary">电视变“礼器”？UWB指向遥控逐渐成为这个行业的必选项</p>
             </div>
-            <a href="https://news.google.com/rss/articles/CBMiU0FVX3lxTFBjLXY5OE9lR0pPX3dGZU84eHlFMFVFMXdfaWZOVzJ3NzloMVRMa1FnZ2lfTmJtWjJ5bHJScU1UUzVoM3pKdGN4a19YRll6YmxKbWRj?oc=5" class="title-link" target="_blank">2025年，UWB的B端市场，乏善可陈</a>
-            <p class="summary">2025年，UWB的B端市场，乏善可陈 电子工程专辑</p>
-        </div>
-        
-        <div class="card">
-            <div class="meta-info">
-                <span class="tag">NEWS</span>
-                <span class="source">电子工程专辑 (via Google) · 01-04</span>
+            
+            <div class="card">
+                <div class="meta-info">
+                    <span class="tag">CHIPS</span>
+                    <span class="source">电子工程专辑 · 01-08</span>
+                </div>
+                <a href="https://news.google.com/rss/articles/CBMiU0FVX3lxTE44ejktQWlXM3RJdjVUSFVKSTIxcVctdzBSWDcxb3ZBQmtxU0NYWWFxa3M1N1p1anpJQ3lxd0pIVnVHNFdRZUFpYllZeDlxVUZYRGlB?oc=5" class="title-link" target="_blank">UWB产业圈，半个圈子大咖都来了！</a>
+                <p class="summary">UWB产业圈，半个圈子大咖都来了！</p>
             </div>
-            <a href="https://news.google.com/rss/articles/CBMiU0FVX3lxTE16YUkxa0RHR3ZHV1hSWTN4Vk5XRVVaM0t3VndCUEN1ZGp2TVdUT1RVLTBWZ2xDUWFuNlBXeHAzUGxmcnNHT1JUWTktelpickVkbkVz?oc=5" class="title-link" target="_blank">全球Wi-Fi网络设备巨头，开始卷UWB了</a>
-            <p class="summary">全球Wi-Fi网络设备巨头，开始卷UWB了 电子工程专辑</p>
-        </div>
-        
-        <div class="card">
-            <div class="meta-info">
-                <span class="tag">NEWS</span>
-                <span class="source">电子工程专辑 (via Google) · 12-31</span>
+            
+            <div class="card">
+                <div class="meta-info">
+                    <span class="tag">CHIPS</span>
+                    <span class="source">电子工程专辑 · 01-06</span>
+                </div>
+                <a href="https://news.google.com/rss/articles/CBMiU0FVX3lxTFBjLXY5OE9lR0pPX3dGZU84eHlFMFVFMXdfaWZOVzJ3NzloMVRMa1FnZ2lfTmJtWjJ5bHJScU1UUzVoM3pKdGN4a19YRll6YmxKbWRj?oc=5" class="title-link" target="_blank">2025年，UWB的B端市场，乏善可陈</a>
+                <p class="summary">2025年，UWB的B端市场，乏善可陈</p>
             </div>
-            <a href="https://news.google.com/rss/articles/CBMiU0FVX3lxTE54cUNTWjVQUjd0MXZkbXRRWHFtOF9McU9QaTM5YzEwTlNzVExxa0I0WHhRN0hiY2NfcFV6LTFlZEM1ellMOTktLVdTLTIySkRSZC1F?oc=5" class="title-link" target="_blank">通感一体时代来临，UWB高精度定位产业圈年会即将开启！</a>
-            <p class="summary">通感一体时代来临，UWB高精度定位产业圈年会即将开启！ 电子工程专辑</p>
-        </div>
-        
-        <div class="card">
-            <div class="meta-info">
-                <span class="tag">NEWS</span>
-                <span class="source">Global Growth Insights (via Google) · 12-29</span>
+            
+            <div class="card">
+                <div class="meta-info">
+                    <span class="tag">CHIPS</span>
+                    <span class="source">电子工程专辑 · 01-04</span>
+                </div>
+                <a href="https://news.google.com/rss/articles/CBMiU0FVX3lxTE16YUkxa0RHR3ZHV1hSWTN4Vk5XRVVaM0t3VndCUEN1ZGp2TVdUT1RVLTBWZ2xDUWFuNlBXeHAzUGxmcnNHT1JUWTktelpickVkbkVz?oc=5" class="title-link" target="_blank">全球Wi-Fi网络设备巨头，开始卷UWB了</a>
+                <p class="summary">全球Wi-Fi网络设备巨头，开始卷UWB了</p>
             </div>
-            <a href="https://news.google.com/rss/articles/CBMikAFBVV95cUxQVXdTanJFeENiZllRUkxWLW1EUE1qbUw0NlBSVFFNc1QzRzlCN0RYQjl0T1E1LWZkM0hCS085VEtadzk5cFNoV3docG5MaDlGcEhLemw2ZFVudEs5enZWLS1VSHBiLUIxMzlHVGlZaXhZOC1rZU1BMWVHM1MzTC1Qc29VT0JTd3d4eFI5dldzdUI?oc=5" class="title-link" target="_blank">超宽带（UWB）市场规模和机会报告，2033年</a>
-            <p class="summary">超宽带（UWB）市场规模和机会报告，2033年 Global Growth Insights</p>
-        </div>
-        
-        <div class="card">
-            <div class="meta-info">
-                <span class="tag">NEWS</span>
-                <span class="source">RFID世界网 (via Google) · 12-25</span>
+            
+            <div class="card">
+                <div class="meta-info">
+                    <span class="tag">CHIPS</span>
+                    <span class="source">电子工程专辑 · 12-31</span>
+                </div>
+                <a href="https://news.google.com/rss/articles/CBMiU0FVX3lxTE54cUNTWjVQUjd0MXZkbXRRWHFtOF9McU9QaTM5YzEwTlNzVExxa0I0WHhRN0hiY2NfcFV6LTFlZEM1ellMOTktLVdTLTIySkRSZC1F?oc=5" class="title-link" target="_blank">通感一体时代来临，UWB高精度定位产业圈年会即将开启！</a>
+                <p class="summary">通感一体时代来临，UWB高精度定位产业圈年会即将开启！</p>
             </div>
-            <a href="https://news.google.com/rss/articles/CBMiakFVX3lxTE9nTDkwaDhPbXUxc0hZX1drMlZEdEpBZEg1YUltd0NUX2huYjFmVHp2Skx5dnJrcjlqNWpwYzQ2LXJaUTBSVVo3bFVBUlNUeUVrSFRFektkeEs5SFJDYnJFclpzYXpGMWtjM1E?oc=5" class="title-link" target="_blank">首款UWB指向遥控，杀入投影仪行业！</a>
-            <p class="summary">首款UWB指向遥控，杀入投影仪行业！ RFID世界网</p>
-        </div>
-        
-        <div class="card">
-            <div class="meta-info">
-                <span class="tag">NEWS</span>
-                <span class="source">RFID世界网 (via Google) · 12-24</span>
+            
+            <div class="card">
+                <div class="meta-info">
+                    <span class="tag">CHIPS</span>
+                    <span class="source">Global Growth Insights · 12-29</span>
+                </div>
+                <a href="https://news.google.com/rss/articles/CBMikAFBVV95cUxQVXdTanJFeENiZllRUkxWLW1EUE1qbUw0NlBSVFFNc1QzRzlCN0RYQjl0T1E1LWZkM0hCS085VEtadzk5cFNoV3docG5MaDlGcEhLemw2ZFVudEs5enZWLS1VSHBiLUIxMzlHVGlZaXhZOC1rZU1BMWVHM1MzTC1Qc29VT0JTd3d4eFI5dldzdUI?oc=5" class="title-link" target="_blank">超宽带（UWB）市场规模和机会报告，2033年</a>
+                <p class="summary">超宽带（UWB）市场规模和机会报告，2033年</p>
             </div>
-            <a href="https://news.google.com/rss/articles/CBMiakFVX3lxTE80QzRTMEdaQmwzVWE5YndWdnJFWnNIWmtBSGFMN3lBNTllUkxuN2RfMGdOYU5waWYzeHg3bVpjcXN0NlVtSmhEZHBGeE9FRE1TUnAxTExuN1lJQ0xuQlhzUTIyTUViY2Vja0E?oc=5" class="title-link" target="_blank">UWB跟随市场需求很旺，但市场真的很大吗？</a>
-            <p class="summary">UWB跟随市场需求很旺，但市场真的很大吗？ RFID世界网</p>
-        </div>
-        
+            
+            <div class="card">
+                <div class="meta-info">
+                    <span class="tag">CHIPS</span>
+                    <span class="source">RFID世界网 · 12-25</span>
+                </div>
+                <a href="https://news.google.com/rss/articles/CBMiakFVX3lxTE9nTDkwaDhPbXUxc0hZX1drMlZEdEpBZEg1YUltd0NUX2huYjFmVHp2Skx5dnJrcjlqNWpwYzQ2LXJaUTBSVVo3bFVBUlNUeUVrSFRFektkeEs5SFJDYnJFclpzYXpGMWtjM1E?oc=5" class="title-link" target="_blank">首款UWB指向遥控，杀入投影仪行业！</a>
+                <p class="summary">首款UWB指向遥控，杀入投影仪行业！</p>
+            </div>
+            
+            <div class="card">
+                <div class="meta-info">
+                    <span class="tag">CHIPS</span>
+                    <span class="source">RFID世界网 · 12-24</span>
+                </div>
+                <a href="https://news.google.com/rss/articles/CBMiakFVX3lxTE80QzRTMEdaQmwzVWE5YndWdnJFWnNIWmtBSGFMN3lBNTllUkxuN2RfMGdOYU5waWYzeHg3bVpjcXN0NlVtSmhEZHBGeE9FRE1TUnAxTExuN1lJQ0xuQlhzUTIyTUViY2Vja0E?oc=5" class="title-link" target="_blank">UWB跟随市场需求很旺，但市场真的很大吗？</a>
+                <p class="summary">UWB跟随市场需求很旺，但市场真的很大吗？</p>
+            </div>
+            </div>
+
             <div class="footer">
                 <div class="tiagile-logo">T<span>i</span>agile</div>
-                <p class="footer-note">Intelligence Powered by GitHub Actions</p>
+                <p>Intelligence Powered by GitHub Actions</p>
             </div>
         </div>
     </body>
