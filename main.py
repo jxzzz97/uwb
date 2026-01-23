@@ -2,13 +2,11 @@ import feedparser
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
-import os
+import re
 
 # --- 配置区域 ---
-# 1. 关键词过滤 (只要文章包含这些词，就会被抓取)
 KEYWORDS = ["UWB", "Ultra-Wideband", "Ultra Wideband", "FiRa", "802.15.4z", "High precision location"]
 
-# 2. RSS 源列表 (通用 IoT 新闻)
 RSS_FEEDS = [
     "https://techcrunch.com/tag/ultra-wideband/feed/",
     "https://www.iotforall.com/feed",
@@ -16,30 +14,24 @@ RSS_FEEDS = [
     "https://www.eetimes.com/designline/internet-of-things-designline/feed/"
 ]
 
-# 3. 专门处理无RSS的官网 (以 FiRa 为例)
-# 这里演示如何直接从网页“扣”新闻
-def scrape_fira_news():
-    url = "https://www.firaconsortium.org/about/news-events/press-releases"
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    news_items = []
-    try:
-        response = requests.get(url, headers=headers)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        # 注意：这里的 class 名需要根据官网实际结构调整，以下是基于通用结构的示例
-        # 假设新闻都在 <h3> 或 <div class="news-item"> 里
-        # 这里为了演示稳定性，我们模拟一条“置顶”数据，实际需根据 F12 审查元素调整
-        news_items.append({
-            'title': "【监控】FiRa 官网最新动态 (请检查官网)",
-            'link': url,
-            'source': 'FiRa Consortium',
-            'date': datetime.now()
-        })
-    except Exception as e:
-        print(f"FiRa 抓取失败: {e}")
-    return news_items
+# --- 辅助功能：清洗摘要 ---
+def clean_summary(html_text):
+    if not html_text:
+        return "暂无详细摘要，请点击标题查看原文。"
+    
+    # 1. 使用 BeautifulSoup 去除 HTML 标签 (如 <p>, <div>, <img>)
+    soup = BeautifulSoup(html_text, 'html.parser')
+    text = soup.get_text(separator=' ')
+    
+    # 2. 去除多余的空格和换行
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    # 3. 截取前 120 个字符 (约 50-80 个汉字或英文单词)
+    if len(text) > 120:
+        return text[:120] + "..."
+    return text
 
 # --- 核心逻辑 ---
-
 def check_keywords(text):
     text = text.lower()
     for kw in KEYWORDS:
@@ -47,68 +39,139 @@ def check_keywords(text):
             return True
     return False
 
+def scrape_fira_news():
+    # 这里的代码针对 FiRa 官网，目前还是模拟数据
+    # 真实抓取需要根据官网结构定制
+    url = "https://www.firaconsortium.org/about/news-events/press-releases"
+    return [{
+        'title': "【FiRa 官网动态】请点击查看最新联盟新闻",
+        'link': url,
+        'source': 'FiRa Consortium',
+        'date': datetime.now(),
+        'summary': "FiRa 联盟官方新闻发布页，点击直达官网查看最新的标准制定与合作动态。"
+    }]
+
 def generate_newsletter():
     articles = []
 
     # 1. 处理 RSS 源
     print("正在抓取 RSS 源...")
     for url in RSS_FEEDS:
-        feed = feedparser.parse(url)
-        for entry in feed.entries[:10]: # 每个源只看最新的10条
-            content_to_check = entry.title + " " + entry.get('summary', '')
-            if check_keywords(content_to_check):
-                articles.append({
-                    'title': entry.title,
-                    'link': entry.link,
-                    'source': feed.feed.get('title', 'Unknown Source'),
-                    'date': entry.get('published_parsed', datetime.now().timetuple())
-                })
+        try:
+            feed = feedparser.parse(url)
+            for entry in feed.entries[:10]:
+                # 组合标题和摘要来检查关键词
+                summary_raw = entry.get('summary', entry.get('description', ''))
+                content_to_check = entry.title + " " + summary_raw
+                
+                if check_keywords(content_to_check):
+                    # 提取并清洗摘要
+                    clean_sum = clean_summary(summary_raw)
+                    
+                    articles.append({
+                        'title': entry.title,
+                        'link': entry.link,
+                        'source': feed.feed.get('title', 'Unknown Source'),
+                        'date': entry.get('published_parsed', datetime.now().timetuple()),
+                        'summary': clean_sum  # 新增摘要字段
+                    })
+        except Exception as e:
+            print(f"源 {url} 读取失败: {e}")
 
-    # 2. 处理手动爬虫 (FiRa)
-    print("正在抓取 FiRa...")
+    # 2. 处理 FiRa
     articles.extend(scrape_fira_news())
 
-    # 3. 生成 HTML
-    # 简单的 CSS 美化
+    # 3. 按时间倒序排列 (最新的在最前)
+    # 注意：这里做了一个简单的去重处理，防止同一篇文章出现两次
+    seen_links = set()
+    unique_articles = []
+    for art in articles:
+        if art['link'] not in seen_links:
+            unique_articles.append(art)
+            seen_links.add(art['link'])
+    
+    # 如果RSS里的日期格式不对，可能会导致排序报错，这里加个保险
+    try:
+        unique_articles.sort(key=lambda x: x['date'], reverse=True)
+    except:
+        pass # 如果排序失败就保持原样
+
+    # 4. 生成 HTML
     html_template = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>UWB 每日行业情报</title>
         <style>
-            body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f4f9; }}
-            h1 {{ color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }}
+            body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f4f9; color: #333; }}
+            h1 {{ color: #2c3e50; border-bottom: 3px solid #007bff; padding-bottom: 10px; font-size: 1.8rem; }}
             .date {{ color: #666; font-size: 0.9em; margin-bottom: 30px; }}
-            .card {{ background: white; padding: 20px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: transform 0.2s; }}
-            .card:hover {{ transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }}
-            .tag {{ background: #e3f2fd; color: #007bff; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold; }}
-            a {{ text-decoration: none; color: #2c3e50; font-size: 1.1em; font-weight: 600; }}
-            a:hover {{ color: #007bff; }}
-            .source {{ color: #888; font-size: 0.9em; margin-top: 5px; display: block; }}
+            
+            .card {{ 
+                background: white; 
+                padding: 24px; 
+                margin-bottom: 20px; 
+                border-radius: 12px; 
+                box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+                transition: transform 0.2s; 
+                border-left: 5px solid #007bff;
+            }}
+            .card:hover {{ transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }}
+            
+            .tag {{ background: #e3f2fd; color: #007bff; padding: 4px 8px; border-radius: 4px; font-size: 0.75em; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }}
+            .source {{ color: #999; font-size: 0.85em; margin-left: 10px; }}
+            
+            a.title-link {{ 
+                text-decoration: none; 
+                color: #2c3e50; 
+                font-size: 1.25em; 
+                font-weight: 700; 
+                display: block; 
+                margin-top: 12px; 
+                margin-bottom: 8px;
+                line-height: 1.4;
+            }}
+            a.title-link:hover {{ color: #007bff; }}
+            
+            .summary {{ 
+                color: #555; 
+                font-size: 0.95em; 
+                line-height: 1.6; 
+                margin: 0; 
+            }}
+            
+            .footer {{ margin-top: 50px; text-align: center; color: #aaa; font-size: 0.8em; }}
         </style>
     </head>
     <body>
         <h1>📡 UWB & IoT 每日情报站</h1>
         <p class="date">更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
         
-        {'<p>今日暂无相关新闻更新。</p>' if not articles else ''}
+        {'<div class="card"><p>今日暂无相关新闻更新。</p></div>' if not unique_articles else ''}
     """
     
-    for art in articles:
+    for art in unique_articles:
         html_template += f"""
         <div class="card">
-            <span class="tag">UWB/IoT</span>
-            <div style="margin-top: 8px;">
-                <a href="{art['link']}" target="_blank">{art['title']}</a>
-                <span class="source">来源: {art['source']}</span>
+            <div>
+                <span class="tag">News</span>
+                <span class="source">{art['source']}</span>
             </div>
+            <a href="{art['link']}" class="title-link" target="_blank">{art['title']}</a>
+            <p class="summary">{art['summary']}</p>
         </div>
         """
         
-    html_template += "</body></html>"
+    html_template += """
+        <div class="footer">
+            Powered by GitHub Actions | Auto-generated daily
+        </div>
+    </body>
+    </html>
+    """
 
-    # 写入 index.html
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(html_template)
     print("完成！index.html 已生成。")
