@@ -6,7 +6,7 @@ import re
 import time
 import urllib.parse
 
-# --- 1. 核心关键词 (中英文) ---
+# --- 1. 核心关键词配置 ---
 TARGET_KEYWORDS = [
     "UWB", "Ultra-Wideband", "Ultra Wideband", "超宽带", 
     "FiRa", "802.15.4z", "CCC Digital Key", 
@@ -15,37 +15,42 @@ TARGET_KEYWORDS = [
     "精位科技", "全迹科技", "TSingo", "信维通信", "浩云科技"
 ]
 
-# --- 2. 构造 Google News 搜索源 (更强大的中文收录) ---
+# --- 2. 构造搜索源 ---
 def get_google_rss_url(query):
     encoded_query = urllib.parse.quote(query)
-    # hl=zh-CN&gl=CN&ceid=CN:zh-Hans 强制请求中文版新闻
     return f"https://news.google.com/rss/search?q={encoded_query}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
 
 RSS_FEEDS = [
-    # --- A. 国际源 (英文 - 依然保留，TechCrunch 防爬较严，我们尝试伪装访问) ---
     "https://techcrunch.com/tag/ultra-wideband/feed/",
     "https://www.iotforall.com/feed",
     "https://www.iot-now.com/feed/",
-    
-    # --- B. 中文全网聚合 (Google News) ---
     get_google_rss_url("UWB 芯片"),
     get_google_rss_url("UWB 产业"),
     get_google_rss_url("超宽带技术"),
-    # 针对公众号和特定厂商
     get_google_rss_url("纽瑞芯 OR 长沙驰芯 OR 加特兰 OR 恩智浦 UWB"),
 ]
 
-# --- 3. 辅助工具 ---
-def clean_summary(html_text):
+# --- 3. 辅助工具：更强的清洗逻辑 ---
+def clean_summary(html_text, source_name=""):
     if not html_text: return "暂无详细摘要，请点击标题阅读原文。"
     try:
         soup = BeautifulSoup(html_text, 'html.parser')
         text = soup.get_text(separator=' ')
         text = re.sub(r'\s+', ' ', text).strip()
-        # 清洗掉 Google News 的常见尾巴
+        
+        # 1. 清洗 Google News 尾巴
         text = text.replace("Google 新闻的完整报道", "").replace("See full coverage on Google News", "")
+        
+        # 2. ✂️ 手术刀：如果来源名字出现在摘要里，把它切掉
+        # 比如来源是 "Sohu"，摘要结尾是 "... Sohu"，则删除
+        if source_name and len(source_name) > 1:
+            # 去除来源名称（忽略大小写）
+            text = re.sub(re.escape(source_name), '', text, flags=re.IGNORECASE).strip()
+            # 去除来源名称可能带来的多余标点
+            text = text.rstrip(" -|:：")
+
         if len(text) < 5: return "点击标题查看详情..."
-        if len(text) > 140: return text[:140] + "..."
+        if len(text) > 120: return text[:120] + "..."
         return text
     except:
         return html_text[:100] + "..."
@@ -54,7 +59,6 @@ def is_recent(entry_date_parsed):
     if not entry_date_parsed: return True 
     try:
         news_date = datetime.fromtimestamp(time.mktime(entry_date_parsed))
-        # 保持 30 天窗口
         return (datetime.now() - news_date).days <= 30
     except:
         return True 
@@ -66,202 +70,11 @@ def check_keywords(text):
             return True
     return False
 
-# 针对 FiRa 官网
-def scrape_fira_news():
-    url = "https://www.firaconsortium.org/about/news-events/press-releases"
-    return [{
-        'title': "🔗 FiRa 联盟官方新闻中心 (点击直达)",
-        'link': url,
-        'source': 'FiRa Consortium',
-        'date': datetime.now().timetuple(),
-        'summary': "FiRa 联盟官方发布的最新标准、认证产品及成员动态。"
-    }]
-
-# --- 4. 核心逻辑 (含防拦截机制) ---
-def fetch_feed(url):
-    """
-    使用 requests 库伪装成浏览器下载 RSS，绕过反爬虫拦截
-    """
-    # 伪装头：假装自己是 Windows 上的 Chrome 浏览器
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*'
-    }
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        # 强制编码为 utf-8，防止中文乱码
-        response.encoding = 'utf-8' 
-        # 检查状态码，如果是 403/401 说明被拦截了
-        if response.status_code != 200:
-            print(f"⚠️ 访问被拒绝 (Status {response.status_code}): {url}")
-            return None
-        return feedparser.parse(response.content)
-    except Exception as e:
-        print(f"❌ 网络请求错误: {e}")
-        return None
-
-def generate_newsletter():
-    articles = []
-    print("🚀 开始全网抓取 (启用浏览器伪装模式)...")
-    
-    for url in RSS_FEEDS:
-        print(f"正在扫描: {url} ...")
-        feed = fetch_feed(url)
-        
-        if not feed or not feed.entries:
-            print(f"  --> 未获取到数据 (可能是源无更新或拦截)")
-            continue
-            
-        for entry in feed.entries:
-            # 时间过滤
-            if hasattr(entry, 'published_parsed'):
-                if not is_recent(entry.published_parsed):
-                    continue
-            
-            summary_raw = entry.get('summary', entry.get('description', ''))
-            content_to_check = f"{entry.title} {summary_raw}"
-            
-            if check_keywords(content_to_check):
-                # 来源清洗
-                source_name = feed.feed.get('title', 'Network Source')
-                if "Google" in source_name:
-                    source_name = "Google News / 全网聚合"
-                
-                # 尝试从 Google News 的标题里提取真实媒体源 (Google 标题格式通常是 "标题 - 媒体名")
-                title_clean = entry.title
-                if " - " in title_clean:
-                    parts = title_clean.rsplit(" - ", 1)
-                    title_clean = parts[0]
-                    real_source = parts[1]
-                    source_name = f"{real_source} (via Google)"
-
-                articles.append({
-                    'title': title_clean,
-                    'link': entry.link,
-                    'source': source_name,
-                    'date': entry.get('published_parsed', datetime.now().timetuple()),
-                    'summary': clean_summary(summary_raw)
-                })
-
-    # 加入 FiRa
-    articles.extend(scrape_fira_news())
-
-    # 去重
-    seen_links = set()
-    unique_articles = []
-    for art in articles:
-        if art['link'] not in seen_links:
-            unique_articles.append(art)
-            seen_links.add(art['link'])
-            
-    # 排序
-    unique_articles.sort(key=lambda x: time.mktime(x['date']) if x['date'] else 0, reverse=True)
-
-    # 空状态
-    empty_html = ""
-    if len(unique_articles) <= 1:
-        empty_html = '<div class="empty-msg"><h3>📡</h3><p>正在扫描全网数据，暂未发现 30 天内的核心关键词匹配项。</p></div>'
-
-    # 生成 HTML (保持原UI)
-    html_template = f"""
-    <!DOCTYPE html>
-    <html lang="zh-CN">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Tiagile - UWB & IoT 行业情报</title>
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
-        <style>
-            body {{
-                font-family: 'Poppins', 'Noto Sans SC', sans-serif;
-                margin: 0; padding: 0;
-                background: linear-gradient(rgba(240, 242, 250, 0.9), rgba(240, 242, 250, 0.9)), url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1920&q=80');
-                background-size: cover; background-attachment: fixed; background-position: center;
-                min-height: 100vh; display: flex; justify-content: center; align-items: flex-start;
-            }}
-            .main-container {{
-                width: 90%; max-width: 800px; margin: 60px 0; padding: 40px;
-                background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-                border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); border: 1px solid rgba(255, 255, 255, 0.6);
-            }}
-            .header-section {{ text-align: center; margin-bottom: 50px; }}
-            h1 {{
-                font-weight: 800; font-size: 2.4rem; margin-bottom: 10px;
-                background: linear-gradient(135deg, #0061ff, #60efff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-                display: inline-block; letter-spacing: -1px;
-            }}
-            .date {{ color: #555; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-size: 0.9rem; }}
-            
-            .card {{
-                background: #ffffff; padding: 25px; margin-bottom: 25px;
-                border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: all 0.3s ease;
-                border-left: 6px solid #0061ff; position: relative;
-            }}
-            .card:hover {{ transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.1); }}
-            
-            .meta-info {{ display: flex; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }}
-            .tag {{ 
-                background: linear-gradient(135deg, #0061ff, #60efff); color: white; 
-                padding: 4px 12px; border-radius: 20px; font-size: 0.7em; font-weight: 700; 
-                margin-right: 10px; box-shadow: 0 2px 5px rgba(0,97,255,0.3);
-            }}
-            .source {{ color: #888; font-size: 0.85em; font-weight: 600; }}
-            
-            a.title-link {{ 
-                text-decoration: none; color: #1a1a1a; font-size: 1.25em; font-weight: 700; 
-                display: block; margin-bottom: 12px; line-height: 1.4; transition: color 0.2s;
-            }}
-            a.title-link:hover {{ color: #0061ff; }}
-            .summary {{ color: #555; font-size: 0.95em; line-height: 1.7; margin: 0; text-align: justify; }}
-            
-            .empty-msg {{ text-align: center; padding: 60px 20px; color: #888; }}
-            .empty-msg h3 {{ font-size: 3em; margin: 0 0 20px 0; }}
-            
-            .footer {{ margin-top: 60px; text-align: center; padding-top: 30px; border-top: 2px solid rgba(0,0,0,0.05); }}
-            .tiagile-logo {{ font-size: 1.8rem; font-weight: 800; color: #2c3e50; letter-spacing: -1px; display: inline-block; }}
-            .tiagile-logo span {{ color: #0061ff; }}
-            .footer-note {{ color: #aaa; font-size: 0.8em; margin-top: 10px; font-weight: 600; }}
-        </style>
-    </head>
-    <body>
-        <div class="main-container">
-            <div class="header-section">
-                <h1>⚡️ UWB & IoT 行业情报站</h1>
-                <p class="date">{datetime.now().strftime('%Y.%m.%d')} | Tiagile Daily Briefing</p>
-            </div>
-            
-            {empty_html}
-    """
-    
-    for art in unique_articles:
-        try:
-            date_str = time.strftime('%m-%d', art['date'])
-        except:
-            date_str = "Recent"
-            
-        html_template += f"""
-        <div class="card">
-            <div class="meta-info">
-                <span class="tag">NEWS</span>
-                <span class="source">{art['source']} · {date_str}</span>
-            </div>
-            <a href="{art['link']}" class="title-link" target="_blank">{art['title']}</a>
-            <p class="summary">{art['summary']}</p>
-        </div>
-        """
-        
-    html_template += """
-            <div class="footer">
-                <div class="tiagile-logo">T<span>i</span>agile</div>
-                <p class="footer-note">Intelligence Powered by GitHub Actions</p>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-    with open("index.html", "w", encoding="utf-8") as f:
-        f.write(html_template)
-    print("完成！index.html 已生成。")
-
-if __name__ == "__main__":
-    generate_newsletter()
+# --- 4. 智能分类逻辑 ---
+def get_category(title, summary):
+    text = (title + summary).lower()
+    # 优先级 1: 联盟与标准
+    if any(k in text for k in ["fira", "802.15.4z", "ccc", "alliance", "联盟", "标准", "协议"]):
+        return "standards"
+    # 优先级 2: 芯片与大厂
+    if any(k in text for k in ["nxp", "q
