@@ -6,7 +6,7 @@ import re
 import time
 import urllib.parse
 
-# --- 1. 定义核心监测目标 ---
+# --- 1. 核心关键词 (中英文) ---
 TARGET_KEYWORDS = [
     "UWB", "Ultra-Wideband", "Ultra Wideband", "超宽带", 
     "FiRa", "802.15.4z", "CCC Digital Key", 
@@ -15,37 +15,35 @@ TARGET_KEYWORDS = [
     "精位科技", "全迹科技", "TSingo", "信维通信", "浩云科技"
 ]
 
-# --- 2. 构造更强的 Bing 搜索源 ---
-def get_bing_rss_url(query):
-    # 强制加上 sortBy=Date，虽然 Bing 不一定百分百听话，但能增加获取新内容的概率
+# --- 2. 构造 Google News 搜索源 (更强大的中文收录) ---
+def get_google_rss_url(query):
     encoded_query = urllib.parse.quote(query)
-    return f"https://www.bing.com/news/search?q={encoded_query}&format=rss&sortBy=Date"
+    # hl=zh-CN&gl=CN&ceid=CN:zh-Hans 强制请求中文版新闻
+    return f"https://news.google.com/rss/search?q={encoded_query}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
 
 RSS_FEEDS = [
-    # --- A. 国际源 (英文 - 保持稳定) ---
+    # --- A. 国际源 (英文 - 依然保留，TechCrunch 防爬较严，我们尝试伪装访问) ---
     "https://techcrunch.com/tag/ultra-wideband/feed/",
     "https://www.iotforall.com/feed",
     "https://www.iot-now.com/feed/",
     
-    # --- B. 中文广域搜索 (不再局限于 mp.weixin.qq.com) ---
-    # 策略：多用几个行业词，把腾讯网、搜狐等收录的公众号文章都炸出来
-    get_bing_rss_url("UWB 芯片"),
-    get_bing_rss_url("UWB 产业"),
-    get_bing_rss_url("UWB 定位"),
-    get_bing_rss_url("超宽带 技术"),
-    
-    # --- C. 重点厂商定向轰炸 ---
-    get_bing_rss_url("纽瑞芯 OR 长沙驰芯 OR 加特兰 OR 恩智浦 UWB"),
+    # --- B. 中文全网聚合 (Google News) ---
+    get_google_rss_url("UWB 芯片"),
+    get_google_rss_url("UWB 产业"),
+    get_google_rss_url("超宽带技术"),
+    # 针对公众号和特定厂商
+    get_google_rss_url("纽瑞芯 OR 长沙驰芯 OR 加特兰 OR 恩智浦 UWB"),
 ]
 
-# --- 3. 辅助工具 (放宽限制) ---
+# --- 3. 辅助工具 ---
 def clean_summary(html_text):
     if not html_text: return "暂无详细摘要，请点击标题阅读原文。"
     try:
         soup = BeautifulSoup(html_text, 'html.parser')
         text = soup.get_text(separator=' ')
         text = re.sub(r'\s+', ' ', text).strip()
-        text = text.replace("See full coverage on Google News", "")
+        # 清洗掉 Google News 的常见尾巴
+        text = text.replace("Google 新闻的完整报道", "").replace("See full coverage on Google News", "")
         if len(text) < 5: return "点击标题查看详情..."
         if len(text) > 140: return text[:140] + "..."
         return text
@@ -53,10 +51,10 @@ def clean_summary(html_text):
         return html_text[:100] + "..."
 
 def is_recent(entry_date_parsed):
-    if not entry_date_parsed: return True # 如果没抓到时间，默认放行！先看到数据再说
+    if not entry_date_parsed: return True 
     try:
         news_date = datetime.fromtimestamp(time.mktime(entry_date_parsed))
-        # ⚠️ 关键修改：放宽到 30 天，确保能抓到中文内容
+        # 保持 30 天窗口
         return (datetime.now() - news_date).days <= 30
     except:
         return True 
@@ -79,51 +77,71 @@ def scrape_fira_news():
         'summary': "FiRa 联盟官方发布的最新标准、认证产品及成员动态。"
     }]
 
-# --- 核心生成逻辑 ---
+# --- 4. 核心逻辑 (含防拦截机制) ---
+def fetch_feed(url):
+    """
+    使用 requests 库伪装成浏览器下载 RSS，绕过反爬虫拦截
+    """
+    # 伪装头：假装自己是 Windows 上的 Chrome 浏览器
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+    }
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        # 强制编码为 utf-8，防止中文乱码
+        response.encoding = 'utf-8' 
+        # 检查状态码，如果是 403/401 说明被拦截了
+        if response.status_code != 200:
+            print(f"⚠️ 访问被拒绝 (Status {response.status_code}): {url}")
+            return None
+        return feedparser.parse(response.content)
+    except Exception as e:
+        print(f"❌ 网络请求错误: {e}")
+        return None
+
 def generate_newsletter():
     articles = []
-    print("🚀 开始全网抓取 UWB 情报 (宽域模式)...")
+    print("🚀 开始全网抓取 (启用浏览器伪装模式)...")
     
     for url in RSS_FEEDS:
-        try:
-            print(f"正在扫描: {url} ...")
-            feed = feedparser.parse(url)
+        print(f"正在扫描: {url} ...")
+        feed = fetch_feed(url)
+        
+        if not feed or not feed.entries:
+            print(f"  --> 未获取到数据 (可能是源无更新或拦截)")
+            continue
             
-            if not feed.entries:
-                print(f"  ⚠️ 此源返回了 0 条数据，可能是关键词太偏或 Bing 暂时屏蔽。")
+        for entry in feed.entries:
+            # 时间过滤
+            if hasattr(entry, 'published_parsed'):
+                if not is_recent(entry.published_parsed):
+                    continue
             
-            for entry in feed.entries:
+            summary_raw = entry.get('summary', entry.get('description', ''))
+            content_to_check = f"{entry.title} {summary_raw}"
+            
+            if check_keywords(content_to_check):
+                # 来源清洗
+                source_name = feed.feed.get('title', 'Network Source')
+                if "Google" in source_name:
+                    source_name = "Google News / 全网聚合"
                 
-                # 宽松的时间过滤
-                if hasattr(entry, 'published_parsed'):
-                    if not is_recent(entry.published_parsed):
-                        continue
-                
-                summary_raw = entry.get('summary', entry.get('description', ''))
-                content_to_check = f"{entry.title} {summary_raw}"
-                
-                if check_keywords(content_to_check):
-                    # 来源清洗
-                    source_name = feed.feed.get('title', 'Network Source')
-                    title_clean = entry.title
-                    
-                    # 智能标记微信相关内容
-                    # 虽然我们不只搜微信域名，但如果来源里有 QQ、Sohu 等，大概率是公众号转载
-                    if "qq.com" in entry.link or "tencent" in source_name.lower():
-                        source_name = "腾讯网 / 微信生态"
-                        title_clean = title_clean.split(" - 腾讯")[0]
-                    elif "Bing" in source_name:
-                        source_name = "全网聚合 / Bing"
-                    
-                    articles.append({
-                        'title': title_clean,
-                        'link': entry.link,
-                        'source': source_name,
-                        'date': entry.get('published_parsed', datetime.now().timetuple()),
-                        'summary': clean_summary(summary_raw)
-                    })
-        except Exception as e:
-            print(f"❌ 源出错: {e}")
+                # 尝试从 Google News 的标题里提取真实媒体源 (Google 标题格式通常是 "标题 - 媒体名")
+                title_clean = entry.title
+                if " - " in title_clean:
+                    parts = title_clean.rsplit(" - ", 1)
+                    title_clean = parts[0]
+                    real_source = parts[1]
+                    source_name = f"{real_source} (via Google)"
+
+                articles.append({
+                    'title': title_clean,
+                    'link': entry.link,
+                    'source': source_name,
+                    'date': entry.get('published_parsed', datetime.now().timetuple()),
+                    'summary': clean_summary(summary_raw)
+                })
 
     # 加入 FiRa
     articles.extend(scrape_fira_news())
@@ -144,7 +162,7 @@ def generate_newsletter():
     if len(unique_articles) <= 1:
         empty_html = '<div class="empty-msg"><h3>📡</h3><p>正在扫描全网数据，暂未发现 30 天内的核心关键词匹配项。</p></div>'
 
-    # 生成 HTML (UI 保持不变)
+    # 生成 HTML (保持原UI)
     html_template = f"""
     <!DOCTYPE html>
     <html lang="zh-CN">
