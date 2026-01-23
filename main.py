@@ -12,38 +12,39 @@ TARGET_KEYWORDS = [
     "FiRa", "802.15.4z", "CCC Digital Key", 
     "NXP", "Qorvo", "STMicroelectronics", "Apple U1", 
     "纽瑞芯", "NewRadio", "驰芯", "Cixin", "加特兰", "Calterah",
-    "精位科技", "全迹科技", "TSingo"
+    "精位科技", "全迹科技", "TSingo", "信维通信", "浩云科技"
 ]
 
-# --- 2. 构造智能新闻源 (含微信专项) ---
+# --- 2. 构造更强的 Bing 搜索源 ---
 def get_bing_rss_url(query):
-    # 加上 &sortBy=Date 尝试让 Bing 返回更新的结果
+    # 强制加上 sortBy=Date，虽然 Bing 不一定百分百听话，但能增加获取新内容的概率
     encoded_query = urllib.parse.quote(query)
-    return f"https://www.bing.com/news/search?q={encoded_query}&format=rss"
+    return f"https://www.bing.com/news/search?q={encoded_query}&format=rss&sortBy=Date"
 
 RSS_FEEDS = [
-    # --- A. 国际源 (英文) ---
+    # --- A. 国际源 (英文 - 保持稳定) ---
     "https://techcrunch.com/tag/ultra-wideband/feed/",
     "https://www.iotforall.com/feed",
     "https://www.iot-now.com/feed/",
     
-    # --- B. 微信公众号专项抓取 (通过 Bing 侧面实现) ---
-    # 解释：site:mp.weixin.qq.com 强制 Bing 只搜索微信域名
-    get_bing_rss_url("UWB site:mp.weixin.qq.com"), 
-    get_bing_rss_url("超宽带 site:mp.weixin.qq.com"),
+    # --- B. 中文广域搜索 (不再局限于 mp.weixin.qq.com) ---
+    # 策略：多用几个行业词，把腾讯网、搜狐等收录的公众号文章都炸出来
+    get_bing_rss_url("UWB 芯片"),
+    get_bing_rss_url("UWB 产业"),
+    get_bing_rss_url("UWB 定位"),
+    get_bing_rss_url("超宽带 技术"),
     
-    # --- C. 全网中文智能聚合 (特定厂商) ---
+    # --- C. 重点厂商定向轰炸 ---
     get_bing_rss_url("纽瑞芯 OR 长沙驰芯 OR 加特兰 OR 恩智浦 UWB"),
 ]
 
-# --- 3. 辅助工具 ---
+# --- 3. 辅助工具 (放宽限制) ---
 def clean_summary(html_text):
     if not html_text: return "暂无详细摘要，请点击标题阅读原文。"
     try:
         soup = BeautifulSoup(html_text, 'html.parser')
         text = soup.get_text(separator=' ')
         text = re.sub(r'\s+', ' ', text).strip()
-        # 清洗掉 Bing/Google 新闻的常见后缀
         text = text.replace("See full coverage on Google News", "")
         if len(text) < 5: return "点击标题查看详情..."
         if len(text) > 140: return text[:140] + "..."
@@ -52,11 +53,11 @@ def clean_summary(html_text):
         return html_text[:100] + "..."
 
 def is_recent(entry_date_parsed):
-    if not entry_date_parsed: return False
+    if not entry_date_parsed: return True # 如果没抓到时间，默认放行！先看到数据再说
     try:
         news_date = datetime.fromtimestamp(time.mktime(entry_date_parsed))
-        # 微信文章被搜索引擎收录有延迟，所以我们放宽到 14 天
-        return (datetime.now() - news_date).days <= 14
+        # ⚠️ 关键修改：放宽到 30 天，确保能抓到中文内容
+        return (datetime.now() - news_date).days <= 30
     except:
         return True 
 
@@ -81,15 +82,19 @@ def scrape_fira_news():
 # --- 核心生成逻辑 ---
 def generate_newsletter():
     articles = []
-    print("🚀 开始全网抓取 UWB 情报 (含微信公众号)...")
+    print("🚀 开始全网抓取 UWB 情报 (宽域模式)...")
     
     for url in RSS_FEEDS:
         try:
             print(f"正在扫描: {url} ...")
             feed = feedparser.parse(url)
+            
+            if not feed.entries:
+                print(f"  ⚠️ 此源返回了 0 条数据，可能是关键词太偏或 Bing 暂时屏蔽。")
+            
             for entry in feed.entries:
                 
-                # 时间过滤
+                # 宽松的时间过滤
                 if hasattr(entry, 'published_parsed'):
                     if not is_recent(entry.published_parsed):
                         continue
@@ -98,14 +103,14 @@ def generate_newsletter():
                 content_to_check = f"{entry.title} {summary_raw}"
                 
                 if check_keywords(content_to_check):
-                    # 优化来源显示
+                    # 来源清洗
                     source_name = feed.feed.get('title', 'Network Source')
                     title_clean = entry.title
                     
-                    # 如果是微信文章，打上特殊标记
-                    if "mp.weixin.qq.com" in entry.link or "WeChat" in source_name:
-                        source_name = "微信公众号 / WeChat"
-                        # Bing 搜出来的微信标题有时候会带 " - 腾讯网" 后缀，去掉它
+                    # 智能标记微信相关内容
+                    # 虽然我们不只搜微信域名，但如果来源里有 QQ、Sohu 等，大概率是公众号转载
+                    if "qq.com" in entry.link or "tencent" in source_name.lower():
+                        source_name = "腾讯网 / 微信生态"
                         title_clean = title_clean.split(" - 腾讯")[0]
                     elif "Bing" in source_name:
                         source_name = "全网聚合 / Bing"
@@ -137,9 +142,9 @@ def generate_newsletter():
     # 空状态
     empty_html = ""
     if len(unique_articles) <= 1:
-        empty_html = '<div class="empty-msg"><h3>📡</h3><p>正在扫描全网数据，今日暂无特定重大更新。</p></div>'
+        empty_html = '<div class="empty-msg"><h3>📡</h3><p>正在扫描全网数据，暂未发现 30 天内的核心关键词匹配项。</p></div>'
 
-    # 生成 HTML (保持原UI)
+    # 生成 HTML (UI 保持不变)
     html_template = f"""
     <!DOCTYPE html>
     <html lang="zh-CN">
