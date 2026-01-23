@@ -42,7 +42,6 @@ def clean_summary(html_text, source_name=""):
         text = text.replace("Google 新闻的完整报道", "").replace("See full coverage on Google News", "")
         
         # 2. ✂️ 手术刀：如果来源名字出现在摘要里，把它切掉
-        # 比如来源是 "Sohu"，摘要结尾是 "... Sohu"，则删除
         if source_name and len(source_name) > 1:
             # 去除来源名称（忽略大小写）
             text = re.sub(re.escape(source_name), '', text, flags=re.IGNORECASE).strip()
@@ -70,11 +69,246 @@ def check_keywords(text):
             return True
     return False
 
-# --- 4. 智能分类逻辑 ---
+# --- 4. 智能分类逻辑 (已修复断行问题) ---
 def get_category(title, summary):
     text = (title + summary).lower()
     # 优先级 1: 联盟与标准
     if any(k in text for k in ["fira", "802.15.4z", "ccc", "alliance", "联盟", "标准", "协议"]):
         return "standards"
-    # 优先级 2: 芯片与大厂
-    if any(k in text for k in ["nxp", "q
+    
+    # 优先级 2: 芯片与大厂 (拆分成多行以防报错)
+    chip_keywords = [
+        "nxp", "qorvo", "apple", "stmicro", "纽瑞芯", "驰芯", 
+        "加特兰", "芯片", "ic", "半导体", "发布"
+    ]
+    if any(k in text for k in chip_keywords):
+        return "chips"
+        
+    # 默认: 行业资讯
+    return "general"
+
+# 针对 FiRa 官网
+def scrape_fira_news():
+    url = "https://www.firaconsortium.org/about/news-events/press-releases"
+    return [{
+        'title': "FiRa 联盟官方新闻中心 (点击直达)",
+        'link': url,
+        'source': 'FiRa Consortium',
+        'date': datetime.now().timetuple(),
+        'summary': "FiRa 联盟官方发布的最新标准、认证产品及成员动态。",
+        'category': 'standards' # 强制分类
+    }]
+
+# --- 5. 核心逻辑 ---
+def fetch_feed(url):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+    }
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.encoding = 'utf-8' 
+        if response.status_code != 200: return None
+        return feedparser.parse(response.content)
+    except: return None
+
+def generate_newsletter():
+    articles = []
+    print("🚀 开始全网抓取并分类...")
+    
+    # 1. 抓取
+    for url in RSS_FEEDS:
+        feed = fetch_feed(url)
+        if not feed or not feed.entries: continue
+            
+        for entry in feed.entries:
+            if hasattr(entry, 'published_parsed') and not is_recent(entry.published_parsed):
+                continue
+            
+            summary_raw = entry.get('summary', entry.get('description', ''))
+            content_to_check = f"{entry.title} {summary_raw}"
+            
+            if check_keywords(content_to_check):
+                # 来源处理
+                source_name = feed.feed.get('title', 'Network Source')
+                title_clean = entry.title
+                real_source_name_for_cleaning = "" 
+
+                if "Google" in source_name:
+                    source_name = "Google News"
+                
+                # 提取 Google 真实来源
+                if " - " in title_clean:
+                    parts = title_clean.rsplit(" - ", 1)
+                    title_clean = parts[0]
+                    real_source = parts[1]
+                    source_name = f"{real_source}"
+                    real_source_name_for_cleaning = real_source 
+
+                # 智能分类
+                category = get_category(title_clean, summary_raw)
+
+                articles.append({
+                    'title': title_clean,
+                    'link': entry.link,
+                    'source': source_name,
+                    'date': entry.get('published_parsed', datetime.now().timetuple()),
+                    'summary': clean_summary(summary_raw, real_source_name_for_cleaning),
+                    'category': category
+                })
+
+    # 2. 加入 FiRa 并去重
+    articles.extend(scrape_fira_news())
+    seen_links = set()
+    unique_articles = []
+    for art in articles:
+        if art['link'] not in seen_links:
+            unique_articles.append(art)
+            seen_links.add(art['link'])
+    
+    unique_articles.sort(key=lambda x: time.mktime(x['date']) if x['date'] else 0, reverse=True)
+
+    # 3. 分组
+    modules = {
+        "standards": [],
+        "chips": [],
+        "general": []
+    }
+    for art in unique_articles:
+        modules[art['category']].append(art)
+
+    # 4. 生成 HTML
+    cat_titles = {
+        "standards": "🏛️ 权威发布 & 标准动态",
+        "chips": "💎 芯片原厂 & 核心技术",
+        "general": "📰 行业应用 & 市场资讯"
+    }
+
+    content_html = ""
+    for cat_key, arts in modules.items():
+        if not arts: continue 
+        
+        section_html = f"""
+        <div class="section-header">{cat_titles[cat_key]}</div>
+        <div class="news-grid">
+        """
+        
+        for art in arts:
+            try: date_str = time.strftime('%m-%d', art['date'])
+            except: date_str = "Recent"
+            
+            section_html += f"""
+            <div class="card">
+                <div class="meta-info">
+                    <span class="tag">{cat_key.upper()}</span>
+                    <span class="source">{art['source']} · {date_str}</span>
+                </div>
+                <a href="{art['link']}" class="title-link" target="_blank">{art['title']}</a>
+                <p class="summary">{art['summary']}</p>
+            </div>
+            """
+        section_html += "</div>"
+        content_html += section_html
+
+    if not unique_articles:
+        content_html = '<div class="empty-msg"><h3>📡</h3><p>正在扫描全网数据...</p></div>'
+
+    html_template = f"""
+    <!DOCTYPE html>
+    <html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Tiagile - UWB & IoT 行业情报</title>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+        <style>
+            :root {{ --primary-color: #0061ff; --bg-color: #f4f7fa; }}
+            body {{
+                font-family: 'Poppins', 'Noto Sans SC', sans-serif;
+                margin: 0; padding: 0;
+                background-color: var(--bg-color);
+                background-image: linear-gradient(rgba(244, 247, 250, 0.9), rgba(244, 247, 250, 0.9)), url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1920&q=80');
+                background-size: cover; background-attachment: fixed;
+                color: #333;
+            }}
+            .main-container {{
+                max-width: 1000px;
+                margin: 40px auto; padding: 20px;
+            }}
+            .header-section {{ text-align: center; margin-bottom: 40px; padding: 20px; }}
+            h1 {{
+                font-weight: 800; font-size: 2.5rem; margin: 0;
+                background: linear-gradient(135deg, #0061ff, #60efff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+                letter-spacing: -1px;
+            }}
+            .date {{ color: #666; font-weight: 600; margin-top: 5px; font-size: 0.9rem; text-transform: uppercase; }}
+
+            .section-header {{
+                font-size: 1.4rem; font-weight: 700; color: #2c3e50;
+                margin: 30px 0 15px 0; padding-left: 15px;
+                border-left: 5px solid var(--primary-color);
+            }}
+            
+            .news-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+                gap: 20px;
+            }}
+
+            .card {{
+                background: #ffffff; padding: 20px;
+                border-radius: 12px;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+                transition: transform 0.2s, box-shadow 0.2s;
+                border: 1px solid rgba(0,0,0,0.05);
+                display: flex; flex-direction: column;
+            }}
+            .card:hover {{ transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,0,0,0.08); }}
+            
+            .meta-info {{ display: flex; align-items: center; margin-bottom: 10px; font-size: 0.8em; }}
+            .tag {{ 
+                background: #eef4ff; color: var(--primary-color); 
+                padding: 3px 8px; border-radius: 6px; font-weight: 700; margin-right: 8px; 
+            }}
+            .source {{ color: #888; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+            
+            a.title-link {{ 
+                text-decoration: none; color: #1a1a1a; font-size: 1.1rem; font-weight: 700; 
+                line-height: 1.4; margin-bottom: 10px; display: block;
+            }}
+            a.title-link:hover {{ color: var(--primary-color); }}
+            .summary {{ color: #555; font-size: 0.9rem; line-height: 1.6; margin: 0; flex-grow: 1; }}
+
+            .footer {{ margin-top: 60px; text-align: center; color: #aaa; font-size: 0.8rem; padding-bottom: 20px; }}
+            .tiagile-logo {{ font-size: 1.5rem; font-weight: 800; color: #2c3e50; }}
+            .tiagile-logo span {{ color: #0061ff; }}
+
+            @media (max-width: 600px) {{
+                .news-grid {{ grid-template-columns: 1fr; }}
+                h1 {{ font-size: 2rem; }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="main-container">
+            <div class="header-section">
+                <h1>⚡️ UWB & IoT 行业情报站</h1>
+                <p class="date">{datetime.now().strftime('%Y.%m.%d')} | Tiagile Daily Briefing</p>
+            </div>
+            
+            {content_html}
+
+            <div class="footer">
+                <div class="tiagile-logo">T<span>i</span>agile</div>
+                <p>Intelligence Powered by GitHub Actions</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    with open("index.html", "w", encoding="utf-8") as f:
+        f.write(html_template)
+    print("完成！index.html 已生成。")
+
+if __name__ == "__main__":
+    generate_newsletter()
