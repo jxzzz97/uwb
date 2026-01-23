@@ -1,77 +1,73 @@
 
     <!DOCTYPE html>
-    <html>
+    <html lang="zh-CN">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>UWB 每日行业情报</title>
+        <title>Tiagile - UWB & IoT 行业情报</title>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
         <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f4f9; color: #333; }
-            h1 { color: #2c3e50; border-bottom: 3px solid #007bff; padding-bottom: 10px; font-size: 1.8rem; }
-            .date { color: #666; font-size: 0.9em; margin-bottom: 30px; }
-            
-            .card { 
-                background: white; 
-                padding: 24px; 
-                margin-bottom: 20px; 
-                border-radius: 12px; 
-                box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
-                transition: transform 0.2s; 
-                border-left: 5px solid #007bff;
+            body {
+                font-family: 'Poppins', -apple-system, sans-serif;
+                margin: 0; padding: 0;
+                background: linear-gradient(rgba(240, 242, 250, 0.85), rgba(240, 242, 250, 0.85)), url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1920&q=80');
+                background-size: cover; background-attachment: fixed; background-position: center;
+                min-height: 100vh; display: flex; justify-content: center; align-items: center;
             }
-            .card:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
-            
-            .tag { background: #e3f2fd; color: #007bff; padding: 4px 8px; border-radius: 4px; font-size: 0.75em; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
-            .source { color: #999; font-size: 0.85em; margin-left: 10px; }
-            
-            a.title-link { 
-                text-decoration: none; 
-                color: #2c3e50; 
-                font-size: 1.25em; 
-                font-weight: 700; 
-                display: block; 
-                margin-top: 12px; 
-                margin-bottom: 8px;
-                line-height: 1.4;
+            .main-container {
+                width: 90%; max-width: 800px; margin: 40px 0; padding: 40px;
+                background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+                border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); border: 1px solid rgba(255, 255, 255, 0.3);
             }
-            a.title-link:hover { color: #007bff; }
-            
-            .summary { 
-                color: #555; 
-                font-size: 0.95em; 
-                line-height: 1.6; 
-                margin: 0; 
+            .header-section { text-align: center; margin-bottom: 40px; }
+            h1 {
+                font-weight: 700; font-size: 2.2rem; margin-bottom: 10px;
+                background: linear-gradient(135deg, #0061ff, #60efff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+                display: inline-block;
             }
-            
-            .footer { margin-top: 50px; text-align: center; color: #aaa; font-size: 0.8em; }
+            .date { color: #666; font-weight: 600; letter-spacing: 1px; }
+            .card {
+                background: rgba(255, 255, 255, 0.95); padding: 25px; margin-bottom: 25px;
+                border-radius: 16px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); transition: all 0.3s ease;
+                border-left: 6px solid #0061ff;
+            }
+            .card:hover { transform: translateY(-5px); box-shadow: 0 12px 25px rgba(0,0,0,0.1); }
+            .meta-info { display: flex; align-items: center; margin-bottom: 12px; }
+            .tag { background: linear-gradient(135deg, #0061ff, #60efff); color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.7em; font-weight: 700; margin-right: 10px; }
+            .source { color: #888; font-size: 0.85em; font-weight: 600; }
+            a.title-link { text-decoration: none; color: #2c3e50; font-size: 1.3em; font-weight: 700; display: block; margin-bottom: 12px; line-height: 1.3; }
+            a.title-link:hover { color: #0061ff; }
+            .summary { color: #555; font-size: 0.95em; line-height: 1.6; margin: 0; }
+            .empty-msg { text-align: center; padding: 60px 20px; color: #888; }
+            .empty-msg h3 { color: #ccc; font-size: 3em; margin: 0 0 20px 0; }
+            .footer { margin-top: 60px; text-align: center; padding-top: 20px; border-top: 2px solid rgba(0,0,0,0.05); }
+            .tiagile-logo { font-size: 1.8rem; font-weight: 800; color: #2c3e50; letter-spacing: -1px; display: inline-block; }
+            .tiagile-logo span { color: #0061ff; }
+            .footer-note { color: #aaa; font-size: 0.8em; margin-top: 10px; font-weight: 600; }
         </style>
     </head>
     <body>
-        <h1>📡 UWB & IoT 每日情报站</h1>
-        <p class="date">更新时间: 2026-01-23 14:16</p>
-        
-        
+        <div class="main-container">
+            <div class="header-section">
+                <h1>⚡️ UWB & IoT 行业情报站</h1>
+                <p class="date">2026.01.23 | Daily Briefing</p>
+            </div>
+            
+            
     
         <div class="card">
-            <div>
-                <span class="tag">News</span>
-                <span class="source">ultra wideband | TechCrunch</span>
-            </div>
-            <a href="https://techcrunch.com/2006/12/18/audiovox-wants-you-wireless-in-your-livingroom/" class="title-link" target="_blank">Audiovox Wants You Wireless In Your Living Room</a>
-            <p class="summary"><img src="https://techcrunch.com/wp-content/uploads/2007/01/video components." The adapters will be sold under the Terk ...</p>
-        </div>
-        
-        <div class="card">
-            <div>
-                <span class="tag">News</span>
-                <span class="source">FiRa Consortium</span>
+            <div class="meta-info">
+                <span class="tag">NEWS</span>
+                <span class="source">FiRa Consortium · 01-23</span>
             </div>
             <a href="https://www.firaconsortium.org/about/news-events/press-releases" class="title-link" target="_blank">【FiRa 官网动态】请点击查看最新联盟新闻</a>
             <p class="summary">FiRa 联盟官方新闻发布页，点击直达官网查看最新的标准制定与合作动态。</p>
         </div>
         
-        <div class="footer">
-            Powered by GitHub Actions | Auto-generated daily
+            <div class="footer">
+                <div class="tiagile-logo">T<span>i</span>agile</div>
+                <p class="footer-note">Intelligence Powered by GitHub Actions</p>
+            </div>
         </div>
     </body>
     </html>
