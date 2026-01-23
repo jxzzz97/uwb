@@ -6,45 +6,44 @@ import re
 import time
 import urllib.parse
 
-# --- 1. 定义核心监测目标 (中英文) ---
-# 只要新闻包含这些词，就会被抓取
+# --- 1. 定义核心监测目标 ---
 TARGET_KEYWORDS = [
-    "UWB", "Ultra-Wideband", "Ultra Wideband", "超宽带", # 核心技术词
-    "FiRa", "802.15.4z", "CCC Digital Key", # 标准词
-    "NXP", "Qorvo", "STMicroelectronics", "Apple U1", # 国际大厂
-    "纽瑞芯", "NewRadio", # 重点国产厂商
-    "驰芯", "Cixin", 
-    "加特兰", "Calterah", # 虽然主做雷达，但也监控
-    "精位科技", "全迹科技" # 其他潜在相关
+    "UWB", "Ultra-Wideband", "Ultra Wideband", "超宽带", 
+    "FiRa", "802.15.4z", "CCC Digital Key", 
+    "NXP", "Qorvo", "STMicroelectronics", "Apple U1", 
+    "纽瑞芯", "NewRadio", "驰芯", "Cixin", "加特兰", "Calterah",
+    "精位科技", "全迹科技", "TSingo"
 ]
 
-# --- 2. 构造智能新闻源 ---
-# 我们利用 Bing News 的 RSS 接口来帮我们搜索全网
+# --- 2. 构造智能新闻源 (含微信专项) ---
 def get_bing_rss_url(query):
+    # 加上 &sortBy=Date 尝试让 Bing 返回更新的结果
     encoded_query = urllib.parse.quote(query)
     return f"https://www.bing.com/news/search?q={encoded_query}&format=rss"
 
 RSS_FEEDS = [
-    # --- 国际源 ---
+    # --- A. 国际源 (英文) ---
     "https://techcrunch.com/tag/ultra-wideband/feed/",
     "https://www.iotforall.com/feed",
     "https://www.iot-now.com/feed/",
     
-    # --- 中文智能聚合源 (代替手动爬官网) ---
-    # 搜索：UWB 行业新闻
-    get_bing_rss_url("UWB 超宽带"),
-    # 搜索：特定厂商动态 (用 OR 连接)
+    # --- B. 微信公众号专项抓取 (通过 Bing 侧面实现) ---
+    # 解释：site:mp.weixin.qq.com 强制 Bing 只搜索微信域名
+    get_bing_rss_url("UWB site:mp.weixin.qq.com"), 
+    get_bing_rss_url("超宽带 site:mp.weixin.qq.com"),
+    
+    # --- C. 全网中文智能聚合 (特定厂商) ---
     get_bing_rss_url("纽瑞芯 OR 长沙驰芯 OR 加特兰 OR 恩智浦 UWB"),
 ]
 
-# --- 3. 辅助工具 (保持稳定) ---
+# --- 3. 辅助工具 ---
 def clean_summary(html_text):
     if not html_text: return "暂无详细摘要，请点击标题阅读原文。"
     try:
         soup = BeautifulSoup(html_text, 'html.parser')
         text = soup.get_text(separator=' ')
         text = re.sub(r'\s+', ' ', text).strip()
-        # 移除一些常见的新闻源噪音
+        # 清洗掉 Bing/Google 新闻的常见后缀
         text = text.replace("See full coverage on Google News", "")
         if len(text) < 5: return "点击标题查看详情..."
         if len(text) > 140: return text[:140] + "..."
@@ -53,13 +52,13 @@ def clean_summary(html_text):
         return html_text[:100] + "..."
 
 def is_recent(entry_date_parsed):
-    if not entry_date_parsed: return False # 如果没有时间，为了保险起见，这行可以根据需要调整
+    if not entry_date_parsed: return False
     try:
         news_date = datetime.fromtimestamp(time.mktime(entry_date_parsed))
-        # 放宽一点时间限制，监测最近 14 天的动态，以免漏掉重要厂商的低频更新
+        # 微信文章被搜索引擎收录有延迟，所以我们放宽到 14 天
         return (datetime.now() - news_date).days <= 14
     except:
-        return True # 如果解析时间失败，默认保留，以免漏掉
+        return True 
 
 def check_keywords(text):
     text = text.lower()
@@ -68,11 +67,9 @@ def check_keywords(text):
             return True
     return False
 
-# --- 4. 专门针对 FiRa 官网的抓取 (因为它是静态网页) ---
+# 针对 FiRa 官网
 def scrape_fira_news():
     url = "https://www.firaconsortium.org/about/news-events/press-releases"
-    # 这里只是一个占位符，实际生产环境建议依赖 Bing News 抓取 FiRa 的 PR
-    # 为了演示，我们保留这个功能，作为一个固定入口
     return [{
         'title': "🔗 FiRa 联盟官方新闻中心 (点击直达)",
         'link': url,
@@ -81,10 +78,10 @@ def scrape_fira_news():
         'summary': "FiRa 联盟官方发布的最新标准、认证产品及成员动态。"
     }]
 
-# --- 5. 核心逻辑 ---
+# --- 核心生成逻辑 ---
 def generate_newsletter():
     articles = []
-    print("🚀 开始全网抓取 UWB 情报...")
+    print("🚀 开始全网抓取 UWB 情报 (含微信公众号)...")
     
     for url in RSS_FEEDS:
         try:
@@ -92,24 +89,29 @@ def generate_newsletter():
             feed = feedparser.parse(url)
             for entry in feed.entries:
                 
-                # 1. 时间过滤
+                # 时间过滤
                 if hasattr(entry, 'published_parsed'):
                     if not is_recent(entry.published_parsed):
                         continue
                 
-                # 2. 关键词匹配
-                # 组合标题和摘要进行检查
                 summary_raw = entry.get('summary', entry.get('description', ''))
                 content_to_check = f"{entry.title} {summary_raw}"
                 
                 if check_keywords(content_to_check):
-                    # 确定来源名称
+                    # 优化来源显示
                     source_name = feed.feed.get('title', 'Network Source')
-                    if "Bing" in source_name:
+                    title_clean = entry.title
+                    
+                    # 如果是微信文章，打上特殊标记
+                    if "mp.weixin.qq.com" in entry.link or "WeChat" in source_name:
+                        source_name = "微信公众号 / WeChat"
+                        # Bing 搜出来的微信标题有时候会带 " - 腾讯网" 后缀，去掉它
+                        title_clean = title_clean.split(" - 腾讯")[0]
+                    elif "Bing" in source_name:
                         source_name = "全网聚合 / Bing"
                     
                     articles.append({
-                        'title': entry.title,
+                        'title': title_clean,
                         'link': entry.link,
                         'source': source_name,
                         'date': entry.get('published_parsed', datetime.now().timetuple()),
@@ -118,10 +120,10 @@ def generate_newsletter():
         except Exception as e:
             print(f"❌ 源出错: {e}")
 
-    # 加入 FiRa 固定入口
+    # 加入 FiRa
     articles.extend(scrape_fira_news())
 
-    # 去重 (根据链接)
+    # 去重
     seen_links = set()
     unique_articles = []
     for art in articles:
@@ -129,15 +131,15 @@ def generate_newsletter():
             unique_articles.append(art)
             seen_links.add(art['link'])
             
-    # 按时间排序
+    # 排序
     unique_articles.sort(key=lambda x: time.mktime(x['date']) if x['date'] else 0, reverse=True)
 
-    # 准备空状态 HTML
+    # 空状态
     empty_html = ""
-    if len(unique_articles) <= 1: # 只有FiRa一条时
+    if len(unique_articles) <= 1:
         empty_html = '<div class="empty-msg"><h3>📡</h3><p>正在扫描全网数据，今日暂无特定重大更新。</p></div>'
 
-    # 生成 HTML (保持你喜欢的华丽 UI)
+    # 生成 HTML (保持原UI)
     html_template = f"""
     <!DOCTYPE html>
     <html lang="zh-CN">
@@ -148,7 +150,7 @@ def generate_newsletter():
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
         <style>
             body {{
-                font-family: 'Poppins', 'Noto Sans SC', sans-serif; /* 增加了中文字体支持 */
+                font-family: 'Poppins', 'Noto Sans SC', sans-serif;
                 margin: 0; padding: 0;
                 background: linear-gradient(rgba(240, 242, 250, 0.9), rgba(240, 242, 250, 0.9)), url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1920&q=80');
                 background-size: cover; background-attachment: fixed; background-position: center;
@@ -209,7 +211,6 @@ def generate_newsletter():
     """
     
     for art in unique_articles:
-        # 日期处理
         try:
             date_str = time.strftime('%m-%d', art['date'])
         except:
