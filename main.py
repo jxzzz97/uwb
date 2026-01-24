@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import re
 import time
 import urllib.parse
+from difflib import SequenceMatcher
 
 # --- 1. 核心关键词配置 ---
 TARGET_KEYWORDS = [
@@ -32,7 +33,7 @@ RSS_FEEDS = [
 
 # --- 3. 辅助工具：更强的清洗逻辑 ---
 def clean_summary(html_text, source_name=""):
-    if not html_text: return "暂无详细摘要，请点击标题阅读原文。"
+    if not html_text: return "" # 如果本来就没摘要，返回空
     try:
         soup = BeautifulSoup(html_text, 'html.parser')
         text = soup.get_text(separator=' ')
@@ -41,15 +42,11 @@ def clean_summary(html_text, source_name=""):
         # 1. 清洗 Google News 尾巴
         text = text.replace("Google 新闻的完整报道", "").replace("See full coverage on Google News", "")
         
-        # 2. ✂️ 手术刀：如果来源名字出现在摘要里，把它切掉
+        # 2. ✂️ 手术刀：切掉来源名称
         if source_name and len(source_name) > 1:
-            # 去除来源名称（忽略大小写）
             text = re.sub(re.escape(source_name), '', text, flags=re.IGNORECASE).strip()
-            # 去除来源名称可能带来的多余标点
             text = text.rstrip(" -|:：")
 
-        if len(text) < 5: return "点击标题查看详情..."
-        if len(text) > 120: return text[:120] + "..."
         return text
     except:
         return html_text[:100] + "..."
@@ -69,14 +66,12 @@ def check_keywords(text):
             return True
     return False
 
-# --- 4. 智能分类逻辑 (已修复断行问题) ---
+# --- 4. 智能分类逻辑 ---
 def get_category(title, summary):
     text = (title + summary).lower()
-    # 优先级 1: 联盟与标准
     if any(k in text for k in ["fira", "802.15.4z", "ccc", "alliance", "联盟", "标准", "协议"]):
         return "standards"
     
-    # 优先级 2: 芯片与大厂 (拆分成多行以防报错)
     chip_keywords = [
         "nxp", "qorvo", "apple", "stmicro", "纽瑞芯", "驰芯", 
         "加特兰", "芯片", "ic", "半导体", "发布"
@@ -84,7 +79,6 @@ def get_category(title, summary):
     if any(k in text for k in chip_keywords):
         return "chips"
         
-    # 默认: 行业资讯
     return "general"
 
 # 针对 FiRa 官网
@@ -96,7 +90,7 @@ def scrape_fira_news():
         'source': 'FiRa Consortium',
         'date': datetime.now().timetuple(),
         'summary': "FiRa 联盟官方发布的最新标准、认证产品及成员动态。",
-        'category': 'standards' # 强制分类
+        'category': 'standards'
     }]
 
 # --- 5. 核心逻辑 ---
@@ -129,7 +123,6 @@ def generate_newsletter():
             content_to_check = f"{entry.title} {summary_raw}"
             
             if check_keywords(content_to_check):
-                # 来源处理
                 source_name = feed.feed.get('title', 'Network Source')
                 title_clean = entry.title
                 real_source_name_for_cleaning = "" 
@@ -137,7 +130,6 @@ def generate_newsletter():
                 if "Google" in source_name:
                     source_name = "Google News"
                 
-                # 提取 Google 真实来源
                 if " - " in title_clean:
                     parts = title_clean.rsplit(" - ", 1)
                     title_clean = parts[0]
@@ -145,7 +137,32 @@ def generate_newsletter():
                     source_name = f"{real_source}"
                     real_source_name_for_cleaning = real_source 
 
-                # 智能分类
+                # 清洗摘要
+                final_summary = clean_summary(summary_raw, real_source_name_for_cleaning)
+
+                # 🔥【关键修改】智能去重逻辑 🔥
+                # 比较标题和摘要的相似度
+                # 1. 简单包含检测：如果摘要被包含在标题里（或者标题包含在摘要里且长度差不多），说明是重复废话
+                # 2. 相似度检测：防止只有一两个标点符号的区别
+                
+                # 去除标点和空格进行核心内容比对
+                t_core = re.sub(r'[^\w]', '', title_clean)
+                s_core = re.sub(r'[^\w]', '', final_summary)
+                
+                is_duplicate = False
+                if len(s_core) > 0 and (s_core in t_core or t_core in s_core):
+                    # 如果长度差异很小（说明没有额外信息），则判定为重复
+                    if abs(len(s_core) - len(t_core)) < 10:
+                        is_duplicate = True
+                
+                # 如果判定为重复，或者摘要太短，显示默认文案
+                if is_duplicate or len(final_summary) < 5:
+                    final_summary = "点击标题阅读详细报道..."
+
+                # 截断过长摘要
+                if len(final_summary) > 120: 
+                    final_summary = final_summary[:120] + "..."
+
                 category = get_category(title_clean, summary_raw)
 
                 articles.append({
@@ -153,7 +170,7 @@ def generate_newsletter():
                     'link': entry.link,
                     'source': source_name,
                     'date': entry.get('published_parsed', datetime.now().timetuple()),
-                    'summary': clean_summary(summary_raw, real_source_name_for_cleaning),
+                    'summary': final_summary,
                     'category': category
                 })
 
@@ -308,7 +325,7 @@ def generate_newsletter():
     """
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(html_template)
-    print("完成！index.html 已生成。")
+    print("完成！去重优化版页面已生成。")
 
 if __name__ == "__main__":
     generate_newsletter()
