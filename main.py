@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 import re
 import time
 import urllib.parse
-from difflib import SequenceMatcher
 
 # --- 1. 核心关键词配置 ---
 TARGET_KEYWORDS = [
@@ -31,25 +30,25 @@ RSS_FEEDS = [
     get_google_rss_url("纽瑞芯 OR 长沙驰芯 OR 加特兰 OR 恩智浦 UWB"),
 ]
 
-# --- 3. 辅助工具：更强的清洗逻辑 ---
+# --- 3. 辅助工具 ---
 def clean_summary(html_text, source_name=""):
-    if not html_text: return "" # 如果本来就没摘要，返回空
+    if not html_text: return ""
     try:
         soup = BeautifulSoup(html_text, 'html.parser')
         text = soup.get_text(separator=' ')
         text = re.sub(r'\s+', ' ', text).strip()
         
-        # 1. 清洗 Google News 尾巴
+        # 清洗 Google News 尾巴
         text = text.replace("Google 新闻的完整报道", "").replace("See full coverage on Google News", "")
         
-        # 2. ✂️ 手术刀：切掉来源名称
+        # 切掉来源名称
         if source_name and len(source_name) > 1:
             text = re.sub(re.escape(source_name), '', text, flags=re.IGNORECASE).strip()
             text = text.rstrip(" -|:：")
 
         return text
     except:
-        return html_text[:100] + "..."
+        return html_text[:100]
 
 def is_recent(entry_date_parsed):
     if not entry_date_parsed: return True 
@@ -108,7 +107,7 @@ def fetch_feed(url):
 
 def generate_newsletter():
     articles = []
-    print("🚀 开始全网抓取并分类...")
+    print("🚀 开始全网抓取...")
     
     # 1. 抓取
     for url in RSS_FEEDS:
@@ -140,24 +139,20 @@ def generate_newsletter():
                 # 清洗摘要
                 final_summary = clean_summary(summary_raw, real_source_name_for_cleaning)
 
-                # 🔥【关键修改】智能去重逻辑 🔥
-                # 比较标题和摘要的相似度
-                # 1. 简单包含检测：如果摘要被包含在标题里（或者标题包含在摘要里且长度差不多），说明是重复废话
-                # 2. 相似度检测：防止只有一两个标点符号的区别
-                
+                # 🔥 智能隐藏逻辑 🔥
                 # 去除标点和空格进行核心内容比对
                 t_core = re.sub(r'[^\w]', '', title_clean)
                 s_core = re.sub(r'[^\w]', '', final_summary)
                 
-                is_duplicate = False
+                # 如果摘要被包含在标题里，或者标题包含在摘要里，判定为重复
                 if len(s_core) > 0 and (s_core in t_core or t_core in s_core):
-                    # 如果长度差异很小（说明没有额外信息），则判定为重复
-                    if abs(len(s_core) - len(t_core)) < 10:
-                        is_duplicate = True
+                    # 如果长度差异很小（说明没有额外信息），把摘要设为空
+                    if abs(len(s_core) - len(t_core)) < 20:
+                        final_summary = "" # 彻底清空，不显示
                 
-                # 如果判定为重复，或者摘要太短，显示默认文案
-                if is_duplicate or len(final_summary) < 5:
-                    final_summary = "点击标题阅读详细报道..."
+                # 如果摘要本身就太短，也隐藏
+                if len(final_summary) < 5:
+                    final_summary = ""
 
                 # 截断过长摘要
                 if len(final_summary) > 120: 
@@ -170,7 +165,7 @@ def generate_newsletter():
                     'link': entry.link,
                     'source': source_name,
                     'date': entry.get('published_parsed', datetime.now().timetuple()),
-                    'summary': final_summary,
+                    'summary': final_summary, # 这里可能是空字符串
                     'category': category
                 })
 
@@ -214,6 +209,12 @@ def generate_newsletter():
             try: date_str = time.strftime('%m-%d', art['date'])
             except: date_str = "Recent"
             
+            # 🔥 HTML 生成时的判断逻辑 🔥
+            # 只有当 summary 不为空时，才生成 <p> 标签
+            summary_html = ""
+            if art['summary']:
+                summary_html = f'<p class="summary">{art["summary"]}</p>'
+            
             section_html += f"""
             <div class="card">
                 <div class="meta-info">
@@ -221,7 +222,7 @@ def generate_newsletter():
                     <span class="source">{art['source']} · {date_str}</span>
                 </div>
                 <a href="{art['link']}" class="title-link" target="_blank">{art['title']}</a>
-                <p class="summary">{art['summary']}</p>
+                {summary_html}
             </div>
             """
         section_html += "</div>"
@@ -291,10 +292,16 @@ def generate_newsletter():
             
             a.title-link {{ 
                 text-decoration: none; color: #1a1a1a; font-size: 1.1rem; font-weight: 700; 
-                line-height: 1.4; margin-bottom: 10px; display: block;
+                line-height: 1.4; margin-bottom: 5px; /* 减小下边距，因为可能没有摘要 */
+                display: block;
             }}
             a.title-link:hover {{ color: var(--primary-color); }}
-            .summary {{ color: #555; font-size: 0.9rem; line-height: 1.6; margin: 0; flex-grow: 1; }}
+            
+            .summary {{ 
+                color: #555; font-size: 0.9rem; line-height: 1.6; 
+                margin: 5px 0 0 0; /* 调整间距 */
+                flex-grow: 1; 
+            }}
 
             .footer {{ margin-top: 60px; text-align: center; color: #aaa; font-size: 0.8rem; padding-bottom: 20px; }}
             .tiagile-logo {{ font-size: 1.5rem; font-weight: 800; color: #2c3e50; }}
@@ -325,7 +332,7 @@ def generate_newsletter():
     """
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(html_template)
-    print("完成！去重优化版页面已生成。")
+    print("完成！index.html 已生成。")
 
 if __name__ == "__main__":
     generate_newsletter()
