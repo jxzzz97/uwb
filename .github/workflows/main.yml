@@ -2,8 +2,10 @@ name: Update UWB News
 
 on:
   schedule:
-    - cron: '0 0 * * *' # 每天国际标准时间0点（北京时间早上8点）运行
-  workflow_dispatch: # 允许你手动点击按钮运行
+    # 改为：每 6 小时的第 15 分钟运行一次 (0:15, 6:15, 12:15, 18:15 UTC)
+    # 避开整点高峰期，运行成功率更高
+    - cron: '15 */6 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write # 赋予写入权限，以便更新 html 文件
