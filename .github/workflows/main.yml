@@ -2,38 +2,38 @@ name: Update UWB News
 
 on:
   schedule:
-    # 改为：每 6 小时的第 15 分钟运行一次 (0:15, 6:15, 12:15, 18:15 UTC)
-    # 避开整点高峰期，运行成功率更高
+    # 这里的格式已经清洗过，确保 GitHub 能识别
+    # 对应北京时间: 08:15, 14:15, 20:15, 02:15
     - cron: '15 */6 * * *'
   workflow_dispatch:
 
 permissions:
-  contents: write # 赋予写入权限，以便更新 html 文件
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    - name: Run Scraper
-      run: python main.py
+      - name: Run Scraper
+        run: python main.py
 
-    - name: Commit and Push changes
-      run: |
-        git config --global user.name 'GitHub Action'
-        git config --global user.email 'action@github.com'
-        git add index.html
-        git commit -m "Auto-update news: $(date)" || exit 0
-        git push
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name 'GitHub Action'
+          git config --global user.email 'action@github.com'
+          git add index.html
+          # 智能判断：只有当 index.html 真的变了才提交，避免无效运行
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update news: $(date)" && git push)
