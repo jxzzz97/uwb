@@ -23,11 +23,16 @@ def get_google_rss_url(query):
 RSS_FEEDS = [
     "https://techcrunch.com/tag/ultra-wideband/feed/",
     "https://www.iotforall.com/feed",
+    "https://www.macrumors.com/macrumors.xml",
     "https://www.iot-now.com/feed/",
+    "https://9to5mac.com/feed/",
+    "https://www.theverge.com/rss/index.xml",
     get_google_rss_url("UWB 芯片"),
     get_google_rss_url("UWB 产业"),
+    get_google_rss_url("AirTag"),
+    get_google_rss_url("Apple UWB"),
     get_google_rss_url("超宽带技术"),
-    get_google_rss_url("纽瑞芯 OR 长沙驰芯 OR 加特兰 OR 恩智浦 UWB"),
+    get_google_rss_url("纽瑞芯 OR 驰芯 OR 加特兰 OR 恩智浦 UWB"),
 ]
 
 # --- 3. 辅助工具 ---
@@ -336,3 +341,4 @@ def generate_newsletter():
 
 if __name__ == "__main__":
     generate_newsletter()
+
